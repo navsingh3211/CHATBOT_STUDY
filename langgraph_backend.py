@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-llm = ChatOpenAI()
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 class ChatState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]

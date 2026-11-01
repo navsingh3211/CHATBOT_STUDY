@@ -9,7 +9,15 @@ import sqlite3
 
 load_dotenv()
 
-llm = ChatOpenAI()
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+config ={
+    'run_name':'chatbot-steps',
+    'tags':['llm','chatbot-steps'],
+    'metadata':{
+        'model':'gpt-4o-mini',
+        'description':'this is chatbot app for langgraph database backend example'
+    }
+}
 
 class ChatState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]

@@ -12,13 +12,15 @@ from langchain_core.tools import tool
 from dotenv import load_dotenv
 import sqlite3
 import requests
+import os
 
+os.environ['LANGCHAIN_PROJECT']="tools-demo"
 load_dotenv()
 
 # -------------------
 # 1. LLM
 # -------------------
-llm = ChatOpenAI()
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 # -------------------
 # 2. Tools
@@ -104,7 +106,15 @@ graph.add_conditional_edges("chat_node",tools_condition)
 graph.add_edge('tools', 'chat_node')
 
 chatbot = graph.compile(checkpointer=checkpointer)
+# CONFIG = {'configurable': {'thread_id': 'thread-1'}}
+# out=chatbot.invoke({'messages': [HumanMessage(content="WHat is the stock price of tesla?")]}, config=CONFIG)
+# print(out['messages'][-1].content)
 
+# image = chatbot.get_graph().draw_mermaid_png()
+
+# with open("chatbot_graph.png", "wb") as f:
+#     f.write(image)
+# print(chatbot.get_graph().draw_mermaid())
 # -------------------
 # 7. Helper
 # -------------------

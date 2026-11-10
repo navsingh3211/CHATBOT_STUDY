@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 import sqlite3
 import requests
 import os
+import asyncio
 
 os.environ['LANGCHAIN_PROJECT']="chatbot-mcp-client-demo"
 load_dotenv()
@@ -52,3 +53,44 @@ llm_with_tools = llm.bind_tools(tools)
 # State
 class ChatState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
+
+
+def build_graph():
+
+    async def chat_node(state: ChatState):
+        """LLM node that may answer or request a tool call."""
+        messages = state["messages"]
+        response = await llm_with_tools.ainvoke(messages)
+        return {"messages": [response]}
+
+    tool_node = ToolNode(tools)
+
+    graph = StateGraph(ChatState)
+    graph.add_node("chat_node", chat_node)
+    graph.add_node("tools", tool_node)
+
+    graph.add_edge(START, "chat_node")
+
+    graph.add_conditional_edges("chat_node",tools_condition)
+    graph.add_edge('tools', 'chat_node')
+    chatbot = graph.compile()
+    return chatbot
+
+async def main():
+    chatbot= build_graph()
+
+    #running the graph
+    CONFIG = {'configurable': {'thread_id': 'thread-1'}}
+    out= await chatbot.ainvoke({'messages': [HumanMessage(content="Add two number 23 and 11")]}, config=CONFIG,debug=True)
+    # print(out['messages'][-1].content)
+
+    for message in out["messages"]:
+        # print("\nMessage Type:", type(message).__name__)
+        print("Content:", message.content)
+
+        if hasattr(message, "tool_calls") and message.tool_calls:
+            print("Tool Calls:", message.tool_calls)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

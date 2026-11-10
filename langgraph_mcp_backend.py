@@ -13,6 +13,7 @@ import aiosqlite
 import requests
 import asyncio
 import threading
+import os
 
 load_dotenv()
 
@@ -38,7 +39,7 @@ def submit_async_task(coro):
 # -------------------
 # 1. LLM
 # -------------------
-llm = ChatOpenAI()
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 # -------------------
 # 2. Tools
@@ -56,20 +57,27 @@ def get_stock_price(symbol: str) -> dict:
     r = requests.get(url)
     return r.json()
 
-
-client = MultiServerMCPClient(
-    {
-        "arith": {
-            "transport": "stdio",
-            "command": "python3",
-            "args": ["/Users/nitish/Desktop/mcp-math-server/main.py"],
-        },
-        "expense": {
-            "transport": "streamable_http",  # if this fails, try "sse"
-            "url": "https://splendid-gold-dingo.fastmcp.app/mcp"
+SERVERS = { 
+    "SimpleCalculatorServer":{ # local mcp
+        "transport":"stdio",
+        "command":"/home/navsingh3211/anaconda3/bin/uv",
+        "args":[
+            "run",
+            "fastmcp",
+            "run",
+            "/usr/local/src/myWork/AGENTIC_AI_STUDY/deploy-mcp-on-remote-server/main.py"
+        ]
+    },
+    "expenseTrackerMcpServer":{ #remote deployed mcp 
+        "transport":"streamable_http",
+        "url":"https://navsingh3211-expense-tracker.fastmcp.app/mcp",
+        "headers": {
+            "Authorization": f"Bearer {os.getenv('FASTMCP_AUTH_TOKEN')}"
         }
     }
-)
+}
+
+client = MultiServerMCPClient(SERVERS)
 
 
 def load_mcp_tools() -> list[BaseTool]:
@@ -108,11 +116,15 @@ tool_node = ToolNode(tools) if tools else None
 
 
 async def _init_checkpointer():
-    conn = await aiosqlite.connect(database="chatbot.db")
-    return AsyncSqliteSaver(conn)
-
+    conn = await aiosqlite.connect("chatbot.db")
+    saver = AsyncSqliteSaver(conn)
+    await saver.setup()
+    return saver
 
 checkpointer = run_async(_init_checkpointer())
+
+
+# checkpointer = run_async(_init_checkpointer())
 
 # -------------------
 # 6. Graph
@@ -135,8 +147,14 @@ chatbot = graph.compile(checkpointer=checkpointer)
 # -------------------
 async def _alist_threads():
     all_threads = set()
+
     async for checkpoint in checkpointer.alist(None):
-        all_threads.add(checkpoint.config["configurable"]["thread_id"])
+        configurable = checkpoint.config.get("configurable", {})
+        thread_id = configurable.get("thread_id")
+
+        if thread_id:
+            all_threads.add(thread_id)
+
     return list(all_threads)
 
 
